@@ -20,7 +20,7 @@ jobs:
       with:
         toolchain: stable
     - name: Cache rust directories
-      uses: Swatinem/rust-cache@1
+      uses: Swatinem/rust-cache@v1
       with:
         working-directory: ./src-tauri
     - name: install webkit2gtk (ubuntu only)
