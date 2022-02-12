@@ -95,7 +95,7 @@ async fn sync_ping(logger: Arc<Mutex<PingLog>>) {
     let result = ping();
     match result{
         Ok(rtt) => {
-            println!("{}: Ping is {}", Local::now() ,rtt);
+            // println!("{}: Ping is {}", Local::now() ,rtt);
             let entry = PingEntry{ time, ping: rtt };
             let mut logger = logger.lock().unwrap();
             logger.log(entry);
@@ -108,7 +108,7 @@ async fn ping_loop() {
     let mut logger = Arc::new(Mutex::new(PingLog::new("pinglog.txt")));
     let ping_data = PingData::empty();
     loop {
-        println!("Loop!");
+        // println!("Loop!");
         let ping_data = logger.clone();
         tauri::async_runtime::spawn(async move {
             sync_ping(ping_data).await;
@@ -137,7 +137,7 @@ impl PingLog {
 
     pub fn log(&mut self, entry: PingEntry) {
         let t = format!("{}, {}", entry.time, entry.ping);
-        println!("{}", t);
+        // println!("{}", t);
         write!(&mut self.file, "{}\n", t);
     }
 }

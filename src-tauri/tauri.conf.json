@@ -46,10 +46,14 @@
       }
     },
     "updater": {
-      "active": false
+      "active": true,
+      "endpoints": [
+        "http://localhost:8000/{{target}}/{{current_version}}"
+      ],
+      "dialog": true
     },
     "allowlist": {
-      "all": true
+      "all": false
     },
     "windows": [
       {
