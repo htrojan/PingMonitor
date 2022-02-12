@@ -19,6 +19,10 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
+    - name: Cache rust directories
+      uses: Swatinem/rust-cache@v1
+      with:
+        working-directory: ./src-tauri
     - name: install webkit2gtk (ubuntu only)
       if: matrix.platform == 'ubuntu-latest'
       run: |
