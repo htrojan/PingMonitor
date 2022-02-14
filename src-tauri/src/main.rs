@@ -3,6 +3,7 @@ all(not(debug_assertions), target_os = "windows"),
 windows_subsystem = "windows"
 )]
 
+use std::collections::VecDeque;
 use std::fs;
 use std::fs::File;
 use std::future::Future;
@@ -12,16 +13,17 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use chrono::{DateTime, Local, MIN_DATETIME, Utc};
-use tauri::{command, State};
+use tauri::{App, AppHandle, command, Manager, State, Wry};
 use tokio::io::AsyncWriteExt;
 use std::sync::Mutex;
 use winping::{AsyncPinger, Buffer, CreateError, Error, Pinger, PingFuture};
 use std::io::Write;
+use serde::{Serialize, Deserialize};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize)]
 pub struct PingEntry {
-    time: chrono::DateTime<Utc>,
     ping: u32,
+    time: chrono::DateTime<Utc>,
 }
 
 impl PingEntry {
@@ -30,35 +32,28 @@ impl PingEntry {
     }
 }
 
-/// Stores PingData for the last 600 Entries
-pub struct PingData {
-    data: [PingEntry; 600],
+pub struct PingBuffer {
+    data: Vec<PingEntry>,
     index_start: usize,
-    size: usize
 }
 
-impl PingData {
-    pub fn empty() -> PingData {
-        PingData {
-            data: [PingEntry::empty(); 600],
+impl PingBuffer {
+    pub fn empty() -> PingBuffer {
+        PingBuffer {
+            data: Vec::with_capacity(120),
             index_start: 0,
-            size: 0
         }
     }
 
     pub fn store_entry(&mut self, entry: PingEntry) {
-        if self.size == 600 {
-            // Find last entry in queue
-            let tail_entry = (self.index_start + 600 - 1) % 600;
-            self.data[tail_entry] = entry;
-            self.index_start = tail_entry;
+        self.data.push(entry)
+    }
 
-        } else {
-            // Find index after this one
-            let write_index = (self.index_start + 1) % 600;
-            self.data[write_index] = entry;
-            self.index_start = write_index;
-        }
+    /// Converts the current buffer into a json string and
+    /// deletes the buffers contents
+    pub fn send_json(&mut self) -> String{
+        let data = serde_json::to_string(&self.data);
+        data.unwrap()
     }
 }
 
@@ -90,28 +85,33 @@ fn ping() -> Result<u32, Error> {
     pinger.send(dst, &mut buffer)
 }
 
-async fn sync_ping(logger: Arc<Mutex<PingLog>>) {
+async fn sync_ping(logger: Arc<Mutex<PingLog>>, ping_data: Arc<Mutex<PingBuffer>>, app: AppHandle<Wry>) {
     let time = Utc::now();
     let result = ping();
     match result{
         Ok(rtt) => {
-            // println!("{}: Ping is {}", Local::now() ,rtt);
             let entry = PingEntry{ time, ping: rtt };
             let mut logger = logger.lock().unwrap();
-            logger.log(entry);
+            logger.log(entry.clone());
+            // let mut ping_data = ping_data.lock().unwrap();
+            // ping_data.store_entry(entry);
+            app.emit_all("ping".into(), &entry);
         },
         Err(_) => {eprint!("Error!\n")}
     }
 }
 
-async fn ping_loop() {
-    let mut logger = Arc::new(Mutex::new(PingLog::new("pinglog.txt")));
-    let ping_data = PingData::empty();
+async fn ping_loop(app: AppHandle<Wry>) {
+    let logger = Arc::new(Mutex::new(PingLog::new("pinglog.txt")));
+    let ping_data = Arc::new(Mutex::new(PingBuffer::empty()));
+
     loop {
         // println!("Loop!");
-        let ping_data = logger.clone();
+        let ping_data = ping_data.clone();
+        let logger = logger.clone();
+        let app2 = app.clone();
         tauri::async_runtime::spawn(async move {
-            sync_ping(ping_data).await;
+            sync_ping(logger.clone(), ping_data.clone(), app2).await;
         });
         tokio::time::sleep(Duration::from_secs(1)).await;
 
@@ -143,9 +143,14 @@ impl PingLog {
 }
 
 fn main() {
-    tauri::async_runtime::spawn(ping_loop());
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![test_ping])
+        // .invoke_handler(tauri::generate_handler![test_ping])
+        .setup(|app| {
+            let app2 = app.handle().clone();
+            tauri::async_runtime::spawn(ping_loop(app2));
+            println!("Setup events");
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

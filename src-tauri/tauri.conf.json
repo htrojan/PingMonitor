@@ -48,12 +48,13 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "http://localhost:8000/{{target}}/{{current_version}}"
+        "https://update.lobbi44.me/update/{{target}}/{{current_version}}"
       ],
-      "dialog": true
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk0NDE1MzE1NTFFOTk1OUEKUldTYWxlbFJGVk5CbEI3RzhlYW5kdi80d1pNMDAxZWtJYTNOOTFySm52b2ZTNHN0YVR2aUtFVVkK"
     },
     "allowlist": {
-      "all": false
+      "all": true
     },
     "windows": [
       {
