@@ -18,6 +18,7 @@ use tokio::io::AsyncWriteExt;
 use std::sync::Mutex;
 use winping::{AsyncPinger, Buffer, CreateError, Error, Pinger, PingFuture};
 use std::io::Write;
+use home::home_dir;
 use serde::{Serialize, Deserialize};
 
 #[derive(Copy, Clone, Serialize)]
@@ -28,7 +29,7 @@ pub struct PingEntry {
 
 impl PingEntry {
     pub fn empty() -> PingEntry {
-        PingEntry{ time: MIN_DATETIME, ping: 0 }
+        PingEntry { time: MIN_DATETIME, ping: 0 }
     }
 }
 
@@ -51,7 +52,7 @@ impl PingBuffer {
 
     /// Converts the current buffer into a json string and
     /// deletes the buffers contents
-    pub fn send_json(&mut self) -> String{
+    pub fn send_json(&mut self) -> String {
         let data = serde_json::to_string(&self.data);
         data.unwrap()
     }
@@ -73,8 +74,8 @@ async fn test_ping() -> Result<String, String> {
 
 fn ping() -> Result<u32, Error> {
     let pinger = match Pinger::new() {
-        Ok(p) => {p}
-        Err(e) => {return Err(Error::Other(256))}
+        Ok(p) => { p }
+        Err(e) => { return Err(Error::Other(256)); }
     };
 
     let dst = String::from("2a00:1450:4001:829::2003")
@@ -88,21 +89,24 @@ fn ping() -> Result<u32, Error> {
 async fn sync_ping(logger: Arc<Mutex<PingLog>>, ping_data: Arc<Mutex<PingBuffer>>, app: AppHandle<Wry>) {
     let time = Utc::now();
     let result = ping();
-    match result{
+    match result {
         Ok(rtt) => {
-            let entry = PingEntry{ time, ping: rtt };
+            let entry = PingEntry { time, ping: rtt };
             let mut logger = logger.lock().unwrap();
             logger.log(entry.clone());
             // let mut ping_data = ping_data.lock().unwrap();
             // ping_data.store_entry(entry);
             app.emit_all("ping".into(), &entry);
-        },
-        Err(_) => {eprint!("Error!\n")}
+        }
+        Err(_) => { eprint!("Error!\n") }
     }
 }
 
 async fn ping_loop(app: AppHandle<Wry>) {
-    let logger = Arc::new(Mutex::new(PingLog::new("pinglog.txt")));
+    let home_dir = home_dir().unwrap().join("pinglog.txt");
+
+    println!("Log file: {:?}", home_dir.to_str());
+    let logger = Arc::new(Mutex::new(PingLog::new(home_dir)));
     let ping_data = Arc::new(Mutex::new(PingBuffer::empty()));
 
     loop {
@@ -114,12 +118,11 @@ async fn ping_loop(app: AppHandle<Wry>) {
             sync_ping(logger.clone(), ping_data.clone(), app2).await;
         });
         tokio::time::sleep(Duration::from_secs(1)).await;
-
     }
 }
 
 struct PingLog {
-    file: File
+    file: File,
 }
 
 // unsafe impl Send for PingLog {}
