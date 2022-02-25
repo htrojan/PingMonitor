@@ -22,6 +22,7 @@ tauri = { version = "^1.0.0-rc.1", features = ["api-all", "updater"] }
 tokio = { version = "^1", features = ["rt", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 chrono = {version = "^0.4.19", features = ["serde"] }
 winping = "0.10.1"
+home = "0.5.3"
 
 [features]
 default = [ "custom-protocol" ]
